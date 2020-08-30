@@ -1,0 +1,193 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+sim <- rnorm(n = 1000, mean = 0, sd = 2)
+sim2 <- rexp(10000, 1)
+library(tidyverse)
+library(EnvStats)
+```
+
+```{r}
+# Test statistics for Cramer von Mises- and Anderson Darling test for Goodness of fit
+W2 <- function(x){
+  n <- length(x)
+  result <- sum((x - (seq(1, 2 * n - 1, 2) / (2 * n))) ** 2)
+  return(result + 1 / (12 * n))
+}
+
+A2 <- function(x){
+  n <- length(x)
+  return(- n - (1 / n) * sum(seq(1, 2 * n - 1, 2) * (log(x) + log(1 - rev(x)))))
+}
+```
+
+
+```{r}
+# Creating a 'print' method for class "gof_test"
+print.gof_test <- function(x){
+  cat('Results of Goodness-of-Fit Test\n-------------------------------\n\nTest Method:                     ',x$Method,'\n\nNull distribution:               ',x$Distribution,'\n\nSample Size:                     ',x$n,'\n\nEstimated Parameters:            ',x$Estimated,'\n\nParameters (and Estimations):    ',x$Parameters,'\n\nTest Statistic:                  ',x$Statistic_Name,' = ',x$Statistic,'\n\n\nIntervals for H0:\n',x$Critical,'', sep='')
+}
+```
+
+
+
+```{r}
+# Distribution functions for the supported distributions
+
+```
+
+
+```{r}
+### Normal Distribution
+# Parameters are given as mu, sigmasq
+normal_gof <- function(x, statistic, param = c(NA, NA)){
+  x <- sort(x)
+  n <- length(x)
+  
+  # Cramer von Mises
+  if(statistic == "cvm"){
+    
+    # mu unknown, sigma known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+      mu_est <- mean(x)
+      w = (x - mu_est) / sqrt(param[2])
+      Z <- pnorm(w, 0, 1)
+      stat <- W2(Z)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu", Parameters = c(as.character(mu_est),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.094] ; .15: [0,.117] ; .10: [0,.134] ; .05: [0,.165] ; .025: [0,.197] ; .01: [0,.238] ; .005: [0,.270] ; .0.0025: [0,.302]")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # mu known, sigma unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      s1sq <- sum((x - param[1])**2) / n
+      w <- (x - param[1]) / sqrt(s1sq)
+      Z <- pnorm(w, 0, 1)
+      stat <- W2(Z)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "sigma^2", Parameters = c(as.character(param[1]),", ",as.character(s1sq)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.190] ; .15: [0,.263] ; .10: [0,.327] ; .05: [0,.442] ; .025: [0,.562] ; .01: [0,.725] ; .005: [0,.851] ; .0.0025: [0,.978]")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      mu_est <- mean(x)
+      ssq <- var(x)
+      w <- (x - mu_est) / sqrt(ssq)
+      Z <- pnorm(w, 0, 1)
+      stat <- W2(Z) * (1 + 0.5 / n)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "W^2", Critical = ".10: [.022,.126] ; .05: [.019,.148]")
+      class(out) <- "gof_test"
+      return(out)
+    } 
+  }
+    
+
+
+  # Anderson Darling
+  if(statistic == "ad"){
+    
+    # mu unknown, sigma known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+      mu_est <- mean(x)
+      w = (x - mu_est) / sqrt(param[2])
+      Z <- pnorm(w, 0, 1)
+      stat <- A2(Z)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu", Parameters = c(as.character(mu_est),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.644] ; .15: [0,.782] ; .10: [0,.894] ; .05: [0,1.087] ; .025: [0,1.285] ; .01: [0,1.551] ; .005: [0,1.756] ; .0.0025: [0,1.964]")
+      class(out) <- "gof_test"
+      return(out)
+      }
+    
+    # mu known, sigma unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      s1sq <- sum((x - param[1])**2) / n
+      w <- (x - param[1]) / sqrt(s1sq)
+      Z <- pnorm(w, 0, 1)
+      stat <- A2(Z)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "sigma^2", Parameters = c(as.character(param[1]),", ",as.character(s1sq)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,1.072] ; .15: [0,1.430] ; .10: [0,1.743] ; .05: [0,2.308] ; .025: [0,2.898] ; .01: [0,3.702] ; .005: [0,4.324] ; .0.0025: [0,4.954]")
+      class(out) <- "gof_test"
+      return(out)
+      }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      mu_est <- mean(x)
+      ssq <- var(x)
+      w <- (x - mu_est) / sqrt(ssq)
+      Z <- pnorm(w, 0, 1)
+      stat <- A2(Z) * (1 + 0.75 / n + 2.25 / (n**2))
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "A^2", Critical = ".10: [.160,.752] ; .05: [.139,.873]")
+      class(out) <- "gof_test"
+      return(out)
+          }   
+  }
+}
+```
+
+```{r}
+### Exponential distribution
+exp_gof <- function(x, statistic) {
+  x <- sort(x)
+  n <- length(x)
+  
+  # Cramer von Mises
+  if(statistic == "cvm"){
+    
+    # Lambda not known, Case 1
+    lambda_est <- 1 / mean(x)
+    Z <- pexp(x, rate = lambda_est)
+    stat <- W2(Z) * (1 + 0.16 / n)
+    out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "exponential", n = n, Estimated = "lambda", Parameters = as.character(lambda_est), Statistic = stat, Statistic_Name = "W^2", Critical = ".10: [.0276,.222] ; .05: [.0233,.251]")
+    class(out) <- "gof_test"
+    return(out)
+    }
+
+  # Anderson Darling
+  if(statistic == "ad"){
+    
+    # Lambda not known, Case 1
+    lambda_est <- 1 / mean(x)
+    Z <- pexp(x, rate = lambda_est)
+    stat <- A2(Z) * (1 + 0.6 / n)
+    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "exponential", n = n, Estimated = "lambda", Parameters = as.character(lambda_est), Statistic = stat, Statistic_Name = "A^2", Critical = ".10: [.208,1.321] ; .05: [.178,1.591]")
+    class(out) <- "gof_test"
+    return(out)
+  }
+}
+```
+
+
+
+```{r}
+values <- rep(0, 10000)
+for(i in 1:10000){
+  sim <- rexp(10000)
+  values[i] <- exp_gof(sim, "ad")$Statistic
+}
+```
+
+```{r}
+length(values[values > .208 & values < 1.321]) / length(values)
+```
+
+Check values
+Normal
+cvm Case1: good Case2: good Case 3: good
+ad Case1: good Case2: good Case2: good
+Exponential
+cvm Case1: good
+ad Case1: good
+
+
+```{r}
+sim <- rexp(10000)
+exp_gof(sim, "ad")
+```
+
+
+
+
+

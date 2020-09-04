@@ -300,7 +300,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
       return(out)
     }
     
-    # both unknown, Case 3
+    # both unknown, Case 3 
     if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
       extreme_value_trans <- extreme_gof(y, "ad", c(NA,NA))
       scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))

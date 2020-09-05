@@ -64,6 +64,32 @@ est_extreme <- function(x, param = c(NA,NA)){
 }
 
 
+# Pareto
+est_pareto <- function(x, param = c(NA,NA)){
+  n <- length(x)
+  
+  # scale unknown, shape known, Case 1
+  if (is.na(param[1]) == TRUE & is.na(param[2]) != TRUE){
+    scale <- min(x, na.rm = TRUE)
+    return(c(scale, param[2]))
+  }
+  
+  # scale known, shape unknown, Case 2
+  if (is.na(param[1]) != TRUE & is.na(param[2]) == TRUE){
+    shape <- n / sum(log(x / param[1]))
+    return(c(param[1], shape))
+  }
+  
+  # both unknown, Case 3
+  if (is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+    scale <- min(x, na.rm = TRUE)
+    shape <- n / sum(log(x / scale))
+    return(c(scale, shape))
+  }
+}
+
+
+
 ### Normal Distribution
 # Parameters are given as mu, sigmasq
 normal_gof <- function(x, statistic, param = c(NA, NA)){

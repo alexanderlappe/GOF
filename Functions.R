@@ -88,7 +88,14 @@ est_pareto <- function(x, param = c(NA,NA)){
   }
 }
 
-
+# Placeholder for generalized pareto from SEAL script
+#
+#
+#
+#
+#
+#
+#
 
 ### Normal Distribution
 # Parameters are given as mu, sigmasq

@@ -194,7 +194,7 @@ exp_gof <- function(x, statistic) {
     lambda_est <- 1 / mean(x)
     Z <- pexp(x, rate = lambda_est)
     stat <- W2(Z) * (1 + 0.16 / n)
-    out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "exponential", n = n, Estimated = "lambda", Parameters = as.character(lambda_est), Statistic = stat, Statistic_Name = "W^2", Critical = ".10: [.0276,.222] ; .05: [.0233,.251]")
+    out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "exponential", n = n, Estimated = "lambda", Parameters = as.character(lambda_est), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.116] ; .15: [0,.148] ; .10: [0,.175] ; .05: [0,.222] ; .025: [0,.271] ; .01: [0,0.338] ; .005: [0,0.390]")
     class(out) <- "gof_test"
     return(out)
   }
@@ -216,7 +216,7 @@ exp_gof <- function(x, statistic) {
 x)[2]
       Z <- F_extreme(x, location, scale)
       stat <- W2(Z) * (1 + 0.2 / sqrt(n))
-      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location, scale", Parameters = c(as.character(location),", ",as.character(scale)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.073]; .10: [0,.102] ; .05: [0,.124] ; .025: [0,.146] ; .01: [0,.175]")
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location, scale", Parameters = c(as.character(location),", ",as.character(scale)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.736] ; .15: [0,.916] ; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959] ; .005: [0,2.244]")
       class(out) <- "gof_test"
       return(out)
     } 

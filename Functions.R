@@ -135,8 +135,7 @@ normal_gof <- function(x, statistic, param = c(NA, NA)){
       w <- (x - mu_est) / sqrt(ssq)
       Z <- pnorm(w, 0, 1)
       stat <- W2(Z) * (1 + 0.5 / n)
-      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "W^2", Critical = ".10: [.022,.126] ; .05: [.019,.148]")
-      class(out) <- "gof_test"
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.074] ; .15: [0,.091] ; .10: [0,.104] ; .05: [0,.126] ; .025: [0,.148] ; .01: [0,.179] ; .005: [0,.201]")
       return(out)
     } 
   }
@@ -175,7 +174,7 @@ normal_gof <- function(x, statistic, param = c(NA, NA)){
       w <- (x - mu_est) / sqrt(ssq)
       Z <- pnorm(w, 0, 1)
       stat <- A2(Z) * (1 + 0.75 / n + 2.25 / (n**2))
-      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "A^2", Critical = ".10: [.160,.752] ; .05: [.139,.873]")
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.470] ; .15: [0,.561] ; .10: [0,.631] ; .05: [0,.752] ; .025: [0,.873] ; .01: [0,1.035] ; .005: [0,1.159]")
       class(out) <- "gof_test"
       return(out)
     }   

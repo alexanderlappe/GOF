@@ -261,6 +261,86 @@ x)[2]
 }
 
 
+### Extreme-value Distribution
+# Parameters are given as location, scale (alpha, beta)
+extreme_gof <- function(x, statistic, param = c(NA, NA)){
+  x <- sort(x)
+  n <- length(x)
+  
+  # Cramer von Mises
+  if(statistic == "cvm"){
+    
+    # location unknown, scale known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+      location <- est_extreme(x, c(NA, param[2]))[1]
+      Z <- F_extreme(x, location, param[2])
+      stat <- W2(Z) * (1 + 0.16 / n)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location", Parameters = c(as.character(location),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.116] ; .10: [0,.175] ; .05: [0,.222] ; .025: [0,.271] ; .01: [0,.338]")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # location known, scale unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      scale <- est_extreme(x, c(param[1],NA))[2]
+      Z <- F_extreme(x, param[1], scale)
+      stat <- W2(Z) 
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "scale", Parameters = c(as.character(param[1]),", ",as.character(scale)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.186]; .10: [0,.320] ; .05: [0,.431] ; .025: [0,.547] ; .01: [0,.705]")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      location <- est_extreme(x)[1]
+      scale <- est_extreme(x)[2]
+      Z <- F_extreme(x, location, scale)
+      stat <- W2(Z) * (1 + 0.2 / sqrt(n))
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location, scale", Parameters = c(as.character(location),", ",as.character(scale)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.073]; .10: [0,.102] ; .05: [0,.124] ; .025: [0,.146] ; .01: [0,.175]")
+      class(out) <- "gof_test"
+      return(out)
+    } 
+  }
+    
+
+
+  # Anderson Darling
+  if(statistic == "ad"){
+    
+    # location unknown, scale known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+      location <- est_extreme(x, c(NA, param[2]))[1]
+      Z <- F_extreme(x, location, param[2])
+      stat <- A2(Z) * (1 + 0.3 / n)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location", Parameters = c(as.character(location),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.736]; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959]")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # location known, scale unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      scale <- est_extreme(x, c(param[1],NA))[2]
+      Z <- F_extreme(x, param[1], scale)
+      stat <- A2(Z) 
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "scale", Parameters = c(as.character(param[1]),", ",as.character(scale)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.1.06]; .10: [0,.1.725] ; .05: [0,2.277] ; .025: [0,2.854] ; .01: [0,3.640]")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      location <- est_extreme(x, c(NA, NA))[1]
+      scale <- est_extreme(x, c(NA, NA))[2]
+      Z <- F_extreme(x, location, scale)
+      stat <- A2(Z) * (1 + 0.2 / sqrt(n)) 
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location, scale", Parameters = c(as.character(location),", ",as.character(scale)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.474]; .10: [0,.637] ; .05: [0,.757] ; .025: [0,.877] ; .01: [0,1.038]")
+      class(out) <- "gof_test"
+      return(out)
+    } 
+  }
+}
+
+
 
 ### Weibull
 # Parameters are given as scale, shape (beta, k)

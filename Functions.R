@@ -29,6 +29,11 @@ F_extreme <- function(x, location, scale){
   return(exp(-exp(-(x - location) / scale)))
 }
 
+# Generalized Pareto
+F_gpd <- function(x, scale, shape){
+  return(1 - (1 - shape * x / scale) ** (1 / shape))
+}
+
 
 ### Estimation Functions
 
@@ -98,8 +103,8 @@ est_gpd <- function(x, param=c(NA,NA)){
     L <- function(a){
       return(n - (1 - param[2]) * sum(x / (a - param[2] * x)))
     }
-    scale <- uniroot(L, c(0.0000001, 100))$root
-    return(c(scale, param[1]))
+    scale <- uniroot(L, c(0.0000001, 0.6), extendInt="yes")$root
+    return(c(scale, param[2]))
   }
   
   # scale known, shape unknown, Case 2
@@ -489,4 +494,87 @@ pareto_gof <- function(x, statistic, param){
       class(out) <- "gof_test"
       return(out)
   }
+  
+  
+  ### Generalized Pareto distribution
+# Parameters are given as scale, shape (a,k)
+# Atm, Case 3 runs into computational errors that should (probably) not occur.
+# Case 2 only works for negative shapes which is undesirable. 
+gpd_gof <- function(x, statistic, param = c(NA, NA)){
+  x <- sort(x)
+  n <- length(x)
+  
+  # Cramer von Mises
+  if(statistic == "cvm"){
+    
+    # scale unknown, shape known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+      scale_est <- est_gpd(x, param = c(NA, param[2]))[1]
+      Z <- F_gpd(x, scale_est, param[2])
+      stat <- W2(Z)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Generalized Pareto", n = n, Estimated = "scale", Parameters = c(as.character(scale_est),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "W^2", Critical = "https://www.tandfonline.com/doi/pdf/10.1198/00401700152672573?casa_token=FKsCzUZmFBYAAAAA:jAf6TceZfULvHuXR3_fu80ykBxgiNhzxTumiQVVFL_iUbUt0Uw_SVawlOFml_cQcp0EXg6IJgkJH")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # scale known, shape unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      shape_est <- est_gpd(x, param = c(param[1], NA))[2]
+      Z <- F_gpd(x, param[1], shape_est)
+      stat <- W2(Z)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Generalized Pareto", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape_est)), Statistic = stat, Statistic_Name = "W^2", Critical = "https://www.tandfonline.com/doi/pdf/10.1198/00401700152672573?casa_token=FKsCzUZmFBYAAAAA:jAf6TceZfULvHuXR3_fu80ykBxgiNhzxTumiQVVFL_iUbUt0Uw_SVawlOFml_cQcp0EXg6IJgkJH")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      scale_est <- est_gpd(x, param = c(NA, NA))[1]
+      shape_est <- est_gpd(x, param = c(NA, NA))[2]
+      Z <- F_gpd(x, scale_est, shape_est)
+      stat <- W2(Z)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Generalized Pareto", n = n, Estimated = "scale, shape", Parameters = c(as.character(scale_est),", ",as.character(shape_est)), Statistic = stat, Statistic_Name = "W^2", Critical = "https://www.tandfonline.com/doi/pdf/10.1198/00401700152672573?casa_token=FKsCzUZmFBYAAAAA:jAf6TceZfULvHuXR3_fu80ykBxgiNhzxTumiQVVFL_iUbUt0Uw_SVawlOFml_cQcp0EXg6IJgkJH")
+      class(out) <- "gof_test"
+      return(out)
+    }
+  }
+    
+
+
+  # Anderson Darling
+  if(statistic == "ad"){
+    
+    
+    # scale unknown, shape known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+      scale_est <- est_gpd(x, param = c(NA, param[2]))[1]
+      Z <- F_gpd(x, scale_est, param[2])
+      stat <- A2(Z)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Generalized Pareto", n = n, Estimated = "scale", Parameters = c(as.character(scale_est),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "A^2", Critical = "https://www.tandfonline.com/doi/pdf/10.1198/00401700152672573?casa_token=FKsCzUZmFBYAAAAA:jAf6TceZfULvHuXR3_fu80ykBxgiNhzxTumiQVVFL_iUbUt0Uw_SVawlOFml_cQcp0EXg6IJgkJH")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # scale known, shape unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      shape_est <- est_gpd(x, param = c(param[1], NA))[2]
+      Z <- F_gpd(x, param[1], shape_est)
+      stat <- A2(Z)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Generalized Pareto", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape_est)), Statistic = stat, Statistic_Name = "A^2", Critical = "https://www.tandfonline.com/doi/pdf/10.1198/00401700152672573?casa_token=FKsCzUZmFBYAAAAA:jAf6TceZfULvHuXR3_fu80ykBxgiNhzxTumiQVVFL_iUbUt0Uw_SVawlOFml_cQcp0EXg6IJgkJH")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      scale_est <- est_gpd(x, param = c(NA, NA))[1]
+      shape_est <- est_gpd(x, param = c(NA, NA))[2]
+      Z <- F_gpd(x, scale_est, shape_est)
+      stat <- A2(Z)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Generalized Pareto", n = n, Estimated = "scale, shape", Parameters = c(as.character(scale_est),", ",as.character(shape_est)), Statistic = stat, Statistic_Name = "A^2", Critical = "https://www.tandfonline.com/doi/pdf/10.1198/00401700152672573?casa_token=FKsCzUZmFBYAAAAA:jAf6TceZfULvHuXR3_fu80ykBxgiNhzxTumiQVVFL_iUbUt0Uw_SVawlOFml_cQcp0EXg6IJgkJH")
+      class(out) <- "gof_test"
+      return(out)
+    }
+  }
+}
 }

@@ -1,9 +1,6 @@
-library(tidyverse)
-library(EnvStats)
-library(rootSolve)
 
 
-# Test statistics for Cramer von Mises- and Anderson Darling test for Goodness of fit
+### Test statistics for Cramer von Mises- and Anderson Darling test for Goodness of fit
 W2 <- function(x){
   n <- length(x)
   result <- sum((x - (seq(1, 2 * n - 1, 2) / (2 * n))) ** 2)
@@ -16,15 +13,15 @@ A2 <- function(x){
 }
 
 
-# Create a 'print' method for class "gof_test"
+### Create a 'print' method for class "gof_test"
 print.gof_test <- function(x){
-  cat('Results of Goodness-of-Fit Test\n-------------------------------\n\nTest Method:                     ',x$Method,'\n\nNull distribution:               ',x$Distribution,'\n\nSample Size:                     ',x$n,'\n\nEstimated Parameters:            ',x$Estimated,'\n\nParameters (and Estimations):    ',x$Parameters,'\n\nTest Statistic:                  ',x$Statistic_Name,' = ',x$Statistic,'\n\n\nIntervals for H0:\n',x$Critical,'', sep='')
+  cat('\nResults of Goodness-of-Fit Test\n-------------------------------\n\nTest Method:                     ',x$Method,'\n\nNull distribution:               ',x$Distribution,'\n\nSample Size:                     ',x$n,'\n\nEstimated Parameters:            ',x$Estimated,'\n\nParameters (and Estimations):    ',x$Parameters,'\n\nTest Statistic:                  ',x$Statistic_Name,' = ',x$Statistic,'\n\n\nIntervals for H0:\n',x$Critical,'', sep='')
 }
 
 
 
 ### Distribution functions for the supported distributions
-# Extreme value
+# Extreme value / Gumbel
 F_extreme <- function(x, location, scale){
   return(exp(-exp(-(x - location) / scale)))
 }
@@ -37,10 +34,10 @@ F_gpd <- function(x, scale, shape){
 
 ### Estimation Functions
 
-# Extreme value
+# Extreme value / Gumbel
 est_extreme <- function(x, param = c(NA,NA)){
   n <- length(x)
-  
+
   # location unknown, scale known, Case 1
   if (is.na(param[1]) == TRUE & is.na(param[2]) != TRUE){
     location <- -param[2] * log(mean(exp(- x / param[2])))
@@ -49,22 +46,25 @@ est_extreme <- function(x, param = c(NA,NA)){
   
   # location known, scale unknown, Case 2
   if (is.na(param[1]) != TRUE & is.na(param[2]) == TRUE){
-    y <- x - param[1]
-    estimator <- function(scale){
-      return((sum(y) - sum(y * exp(- y / scale))) / n - scale)
+    L <- function(scale){
+      return(- sum((x - param[1]) / scale) - n * log(scale) - sum(exp(- (x - param[1]) / scale)))
     }
-    scale <- uniroot(estimator, c(0,100))$root
-    return(c(param[1], scale))
+    scale_est <- optimize(L, c(0.00001, 100), maximum = TRUE)$maximum
+    return(c(param[1], scale_est))
+    
   }
   
   # both unknown, Case 3
   if (is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
-    estimator <- function(scale){
-      return(mean(x) - (sum(x * exp(- x / scale)) / sum(exp(- x / scale))) - scale)
+    L <- function(params){
+      location <- params[1]
+      scale <- params[2]
+      return(-(- sum((x - location) / scale) - n * log(scale) - sum(exp(- (x - location) / scale))))
     }
-    scale <- uniroot(estimator, c(0.1,100))$root
-    location <- - scale * log(1 / n * sum(exp(- x / scale)))
-    return(c(location, scale))
+    location_est <- optim(c(1,1), L)$par[1]
+    scale_est <- optim(c(1,1), L)$par[2]
+
+    return(c(location_est, scale_est))
   }
 }
 
@@ -93,6 +93,7 @@ est_pareto <- function(x, param = c(NA,NA)){
   }
 }
 
+
 # Generalized Pareto
 est_gpd <- function(x, param=c(NA,NA)){
   # Parameters given as scale > 0, shape < 1
@@ -101,9 +102,13 @@ est_gpd <- function(x, param=c(NA,NA)){
   # scale unknown, shape known, Case 1
   if (is.na(param[1]) == TRUE & is.na(param[2]) != TRUE){
     L <- function(a){
-      return(n - (1 - param[2]) * sum(x / (a - param[2] * x)))
+      if (param[2] == 0){
+        return (- n * log(a) - sum(x / a))
+      } else{
+        return(- n * log(a) - (1 - 1 / param[2]) * sum(log(1 - (param[2] * x) / a)))
+      }
     }
-    scale <- uniroot(L, c(0.0000001, 0.6), extendInt="yes")$root
+    scale <- optimize(L, interval = c(0.000001, 100), maximum = TRUE)$maximum
     return(c(scale, param[2]))
   }
   
@@ -121,17 +126,37 @@ est_gpd <- function(x, param=c(NA,NA)){
     L <- function(theta){
   return(- n - sum(log(1 - theta * x)) - n * log(- (1 / (n * theta)) * sum(log(1 - theta * x))))
     }
-    theta_max <- optimize(L, interval = c(0.0000001, max(x)), maximum = TRUE)$maximum
-    shape <- - 1 / n * sum(log(1 - theta_max * x))
+    theta_max <- optimize(L, interval = c(-100, 1 / max(x) - 0.00001), maximum = TRUE)$maximum
+    shape <- - (1 / n) * sum(log(1 - theta_max * x))
     scale <- shape / theta_max
     return(c(scale, shape))
   }
 }
 
+# Gamma
+est_gamma <- function(x, param = c(NA,NA)){
+  # Parameters given as scale > 0, shape > 0
+  n <- length(x)
+  
+  # scale unknown, shape known, Case 1
+  if (is.na(param[1]) == TRUE & is.na(param[2]) != TRUE){
+    return(sum(x) / (param[2] * n))
+  }
+  
+  # scale known, shape unknown, Case 2
+  if (is.na(param[1]) != TRUE & is.na(param[2]) == TRUE){
+    return(NA)
+  }
+  
+  # both unknown, Case 3
+  if (is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+    return(NA)
+  }
+}
 
 ### Normal Distribution
 # Parameters are given as mu, sigmasq
-normal_gof <- function(x, statistic, param = c(NA, NA)){
+gof_normal <- function(x, statistic, param = c(NA, NA)){
   x <- sort(x)
   n <- length(x)
   
@@ -168,12 +193,13 @@ normal_gof <- function(x, statistic, param = c(NA, NA)){
       Z <- pnorm(w, 0, 1)
       stat <- W2(Z) * (1 + 0.5 / n)
       out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.074] ; .15: [0,.091] ; .10: [0,.104] ; .05: [0,.126] ; .025: [0,.148] ; .01: [0,.179] ; .005: [0,.201]")
+      class(out) <- "gof_test"
       return(out)
     } 
   }
-  
-  
-  
+    
+
+
   # Anderson Darling
   if(statistic == "ad"){
     
@@ -186,7 +212,7 @@ normal_gof <- function(x, statistic, param = c(NA, NA)){
       out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu", Parameters = c(as.character(mu_est),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.644] ; .15: [0,.782] ; .10: [0,.894] ; .05: [0,1.087] ; .025: [0,1.285] ; .01: [0,1.551] ; .005: [0,1.756] ; .0.0025: [0,1.964]")
       class(out) <- "gof_test"
       return(out)
-    }
+      }
     
     # mu known, sigma unknown, Case 2
     if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
@@ -197,7 +223,7 @@ normal_gof <- function(x, statistic, param = c(NA, NA)){
       out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "sigma^2", Parameters = c(as.character(param[1]),", ",as.character(s1sq)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,1.072] ; .15: [0,1.430] ; .10: [0,1.743] ; .05: [0,2.308] ; .025: [0,2.898] ; .01: [0,3.702] ; .005: [0,4.324] ; .0.0025: [0,4.954]")
       class(out) <- "gof_test"
       return(out)
-    }
+      }
     
     # both unknown, Case 3
     if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
@@ -209,13 +235,12 @@ normal_gof <- function(x, statistic, param = c(NA, NA)){
       out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "normal", n = n, Estimated = "mu, sigma^2", Parameters = c(as.character(mu_est),", ",as.character(ssq)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.470] ; .15: [0,.561] ; .10: [0,.631] ; .05: [0,.752] ; .025: [0,.873] ; .01: [0,1.035] ; .005: [0,1.159]")
       class(out) <- "gof_test"
       return(out)
-    }   
+          }   
   }
 }
 
-
 ### Exponential distribution
-exp_gof <- function(x, statistic) {
+gof_exp <- function(x, statistic) {
   x <- sort(x)
   n <- length(x)
   
@@ -229,8 +254,8 @@ exp_gof <- function(x, statistic) {
     out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "exponential", n = n, Estimated = "lambda", Parameters = as.character(lambda_est), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.116] ; .15: [0,.148] ; .10: [0,.175] ; .05: [0,.222] ; .025: [0,.271] ; .01: [0,0.338] ; .005: [0,0.390]")
     class(out) <- "gof_test"
     return(out)
-  }
-  
+    }
+
   # Anderson Darling
   if(statistic == "ad"){
     
@@ -238,64 +263,33 @@ exp_gof <- function(x, statistic) {
     lambda_est <- 1 / mean(x)
     Z <- pexp(x, rate = lambda_est)
     stat <- A2(Z) * (1 + 0.6 / n)
-    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "exponential", n = n, Estimated = "lambda", Parameters = as.character(lambda_est), Statistic = stat, Statistic_Name = "A^2", Critical = ".10: [.208,1.321] ; .05: [.178,1.591]")
+    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "exponential", n = n, Estimated = "lambda", Parameters = as.character(lambda_est), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.736] ; .15: [0,.916] ; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959] ; .005: [0,2.244]")
     class(out) <- "gof_test"
     return(out)
   }
 }
 
-
-x)[2]
-      Z <- F_extreme(x, location, scale)
-      stat <- W2(Z) * (1 + 0.2 / sqrt(n))
-      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location, scale", Parameters = c(as.character(location),", ",as.character(scale)), Statistic = stat, Statistic_Name = "W^2", Critical = ".25: [0,.736] ; .15: [0,.916] ; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959] ; .005: [0,2.244]")
-      class(out) <- "gof_test"
-      return(out)
-    } 
-  }
-    
-
-
-  # Anderson Darling
-  if(statistic == "ad"){
-    
-    # location unknown, scale known, Case 1
-    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
-      location <- est_extreme(x, c(NA, param[2]))[1]
-      Z <- F_extreme(x, location, param[2])
-      stat <- A2(Z) * (1 + 0.3 / n)
-      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location", Parameters = c(as.character(location),", ",as.character(param[2])), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.736]; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959]")
-      class(out) <- "gof_test"
-      return(out)
-    }
-    
-    # location known, scale unknown, Case 2
-    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
-      scale <- est_extreme(x, c(param[1],NA))[2]
-      Z <- F_extreme(x, param[1], scale)
-      stat <- A2(Z) 
-      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "scale", Parameters = c(as.character(param[1]),", ",as.character(scale)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.1.06]; .10: [0,.1.725] ; .05: [0,2.277] ; .025: [0,2.854] ; .01: [0,3.640]")
-      class(out) <- "gof_test"
-      return(out)
-    }
-    
-    # both unknown, Case 3
-    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
-      location <- est_extreme(x, c(NA, NA))[1]
-      scale <- est_extreme(x, c(NA, NA))[2]
-      Z <- F_extreme(x, location, scale)
-      stat <- A2(Z) * (1 + 0.2 / sqrt(n)) 
-      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Extreme Value", n = n, Estimated = "location, scale", Parameters = c(as.character(location),", ",as.character(scale)), Statistic = stat, Statistic_Name = "A^2", Critical = ".25: [0,.474]; .10: [0,.637] ; .05: [0,.757] ; .025: [0,.877] ; .01: [0,1.038]")
-      class(out) <- "gof_test"
-      return(out)
-    } 
-  }
+### Uniform Distribution
+# No parameters accepted
+gof_uniform <- function(x){
+  x <- sort(x)
+  n <- length(x)
+  
+  # Only Cramer von Mises is available
+  # Only acceptable case is case of no known parameters
+  a <- min(x)
+  b <- max(x)
+  Z <- punif(x, min = a, max = b)
+  stat <- W2(Z)
+  out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "uniform", n = n, Estimated = "xmin, xmax", Parameters = c(as.character(a),", ",as.character(b)), Statistic = stat, Statistic_Name = "W^2", Critical = "https://www.tandfonline.com/doi/pdf/10.1080/03610919608813360?casa_token=L9tnjIeXo-oAAAAA:tbZlrkJvhnm4iZ9TQ-Q1wgpreds5kHiWYGUDPMC7eRKYoJynt2gJAoYDFHbC1n9e5vCoPgKKcYl8")
+  class(out) <- "gof_test"
+  return(out)
 }
 
 
-### Extreme-value Distribution
+### Extreme-value / Gumbel Distribution
 # Parameters are given as location, scale (alpha, beta)
-extreme_gof <- function(x, statistic, param = c(NA, NA)){
+gof_extreme <- function(x, statistic, param = c(NA, NA)){
   x <- sort(x)
   n <- length(x)
   
@@ -377,8 +371,8 @@ extreme_gof <- function(x, statistic, param = c(NA, NA)){
 ### Weibull
 # Parameters are given as scale, shape (beta, k)
 # Just perform a transformation to get an extreme value distribution, then call       
-# the function extreme_gof
-weibull_gof <- function(x, statistic, param = c(NA, NA)){
+# the function gof_extreme
+gof_weibull <- function(x, statistic, param = c(NA, NA)){
   x <- sort(x)
   n <- length(x)
   y <- sort(-log(x))
@@ -389,7 +383,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # scale unknown, shape known, Case 1
     if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
-    extreme_value_trans <- extreme_gof(y, "cvm", c(NA, 1 / param[2]))
+    extreme_value_trans <- gof_extreme(y, "cvm", c(NA, 1 / param[2]))
     scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
     result <- extreme_value_trans$Statistic
     out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "scale", Parameters = c(as.character(scale),", ",as.character(param[2])), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.116] ; .10: [0,.175] ; .05: [0,.222] ; .025: [0,.271] ; .01: [0,.338]")
@@ -399,7 +393,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # scale known, shape unknown, Case 2
     if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
-    extreme_value_trans <- extreme_gof(y, "cvm", c(- log(1 / param[1]), NA))
+    extreme_value_trans <- gof_extreme(y, "cvm", c(- log(1 / param[1]), NA))
     shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
     result <- extreme_value_trans$Statistic
     out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape)), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.186]; .10: [0,.320] ; .05: [0,.431] ; .025: [0,.547] ; .01: [0,.705]")
@@ -409,7 +403,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # both unknown, Case 3
     if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
-      extreme_value_trans <- extreme_gof(y, "cvm", c(NA,NA))
+      extreme_value_trans <- gof_extreme(y, "cvm", c(NA,NA))
       scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
       shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
       result <- extreme_value_trans$Statistic
@@ -426,37 +420,36 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # scale unknown, shape known, Case 1
     if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
-    extreme_value_trans <- extreme_gof(y, "ad", c(NA, 1 / param[2]))
+    extreme_value_trans <- gof_extreme(y, "ad", c(NA, 1 / param[2]))
     scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
     result <- extreme_value_trans$Statistic
-    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "scale", Parameters = c(as.character(scale),", ",as.character(param[2])), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.736]; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959]")
+    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "scale", Parameters = c(as.character(scale),", ",as.character(param[2])), Statistic = result, Statistic_Name = "A^2", Critical = ".25: [0,.736]; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959]")
       class(out) <- "gof_test"
       return(out)
     }
     
     # scale known, shape unknown, Case 2
     if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
-    extreme_value_trans <- extreme_gof(y, "ad", c(- log(1 / param[1]), NA))
+    extreme_value_trans <- gof_extreme(y, "ad", c(- log(1 / param[1]), NA))
     shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
     result <- extreme_value_trans$Statistic
-    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape)), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.1.06]; .10: [0,.1.725] ; .05: [0,2.277] ; .025: [0,2.854] ; .01: [0,3.640]")
+    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape)), Statistic = result, Statistic_Name = "A^2", Critical = ".25: [0,.1.06]; .10: [0,.1.725] ; .05: [0,2.277] ; .025: [0,2.854] ; .01: [0,3.640]")
       class(out) <- "gof_test"
       return(out)
     }
     
-    # both unknown, Case 3 
+    # both unknown, Case 3
     if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
-      extreme_value_trans <- extreme_gof(y, "ad", c(NA,NA))
+      extreme_value_trans <- gof_extreme(y, "ad", c(NA,NA))
       scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
       shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
       result <- extreme_value_trans$Statistic
-      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "scale, shape", Parameters = c(as.character(scale),", ",as.character(shape)), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.474]; .10: [0,.637] ; .05: [0,.757] ; .025: [0,.877] ; .01: [0,1.038]")
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "scale, shape", Parameters = c(as.character(scale),", ",as.character(shape)), Statistic = result, Statistic_Name = "A^2", Critical = ".25: [0,.474]; .10: [0,.637] ; .05: [0,.757] ; .025: [0,.877] ; .01: [0,1.038]")
       class(out) <- "gof_test"
       return(out)
     } 
   }
 }
-
 
 ### Pareto
 # Parameters are given as scale, shape (xmin, alpha)
@@ -464,7 +457,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
 # the function exponential_gof
 # Can only implement Case 2 atm. Case 1 and 3 should not give accurate critical values
 # as the transformation depends on estimated parameter
-pareto_gof <- function(x, statistic, param){
+gof_pareto <- function(x, statistic, param){
   x <- sort(x)
   n <- length(x)
   
@@ -473,7 +466,7 @@ pareto_gof <- function(x, statistic, param){
     
     # scale known, shape unknown, Case 2
       y <- log(x / param)
-      exp_trans <- exp_gof(y, "cvm")
+      exp_trans <- gof_exp(y, "cvm")
       shape <- exp_trans$Parameters
       result <- exp_trans$Statistic
       out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Pareto", n = n, Estimated = "shape", Parameters = c(as.character(param),", ",as.character(shape)), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.116] ; .15: [0,.148] ; .10: [0,.175] ; .05: [0,.222] ; .025: [0,.271] ; .01: [0,0.338] ; .005: [0,0.390]")
@@ -487,20 +480,21 @@ pareto_gof <- function(x, statistic, param){
     
     # scale known, shape unknown, Case 2
       y <- log(x / param)
-      exp_trans <- exp_gof(y, "ad")
+      exp_trans <- gof_exp(y, "ad")
       shape <- exp_trans$Parameters
       result <- exp_trans$Statistic
       out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Pareto", n = n, Estimated = "shape", Parameters = c(as.character(param),", ",as.character(shape)), Statistic = result, Statistic_Name = "A^2", Critical = ".25: [0,.736] ; .15: [0,.916] ; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959] ; .005: [0,2.244]")
       class(out) <- "gof_test"
       return(out)
   }
+}
   
   
-  ### Generalized Pareto distribution
+### Generalized Pareto distribution
 # Parameters are given as scale, shape (a,k)
 # Atm, Case 3 runs into computational errors that should (probably) not occur.
 # Case 2 only works for negative shapes which is undesirable. 
-gpd_gof <- function(x, statistic, param = c(NA, NA)){
+gof_gpd <- function(x, statistic, param = c(NA, NA)){
   x <- sort(x)
   n <- length(x)
   
@@ -577,4 +571,108 @@ gpd_gof <- function(x, statistic, param = c(NA, NA)){
     }
   }
 }
+
+### Gamma
+# Parameters are given as scale, shape (beta, m)
+gof_gamma <- function(x, statistic, param = c(NA, NA)){
+  x <- sort(x)
+  n <- length(x)
+  
+  # Cramer von Mises
+  if(statistic == "cvm"){
+    
+    # scale unknown, shape known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+      scale_est <- est_gamma(x, param = c(NA, param[2]))
+      Z <- pgamma(x, scale = scale_est, shape = param[2])
+      W <- W2(Z)
+      result <- W
+      if (param[2] == 1){
+        result <- W * (1 + 0.16 / n)
+      }
+      if (param[2] >= 2){
+        result <- (1.8 * n * W - 0.14) / (1.8 * n - 1)
+      }
+    out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Gamma", n = n, Estimated = "scale", Parameters = c(as.character(scale_est),", ",as.character(param[2])), Statistic = result, Statistic_Name = "W^2", Critical = "check documentation for critical values")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # scale known, shape unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      L <- function(m){
+        (m - 1) * sum(log(x)) - sum(x / param[1]) - n * m * log(param[1]) - n * log(gamma(m))
+      }
+      shape_est <- optimize(L, c(0.00001, 100), maximum = TRUE)$maximum
+      Z <- pgamma(x, scale = param[1], shape = shape_est)
+      result <- W2(Z)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Gamma", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape_est)), Statistic = result, Statistic_Name = "W^2", Critical = "check documentation for critical values")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      L <- function(m){
+        (m - 1) * sum(log(x)) - n * m - n * m * log(sum(x / (m * n))) - n * log(gamma(m))
+      }
+      shape_est <- optimize(L, c(0.00001, 100), maximum = TRUE)$maximum
+      scale_est <- mean(x) / shape_est
+      Z <- pgamma(x, scale = scale_est, shape = shape_est)
+      result <- W2(Z)
+      out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Gamma", n = n, Estimated = "scale, shape", Parameters = c(as.character(scale_est),", ",as.character(shape_est)), Statistic = result, Statistic_Name = "W^2", Critical = "check documentation for critical values")
+      class(out) <- "gof_test"
+      return(out)
+    } 
+  }
+    
+
+
+  # Anderson Darling
+  if(statistic == "ad"){
+    
+    # scale unknown, shape known, Case 1
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
+    scale_est <- est_gamma(x, param = c(NA, param[2]))
+      Z <- pgamma(x, scale = scale_est, shape = param[2])
+      A <- A2(Z)
+      result <- A
+      if (param[2] == 1){
+        result <- A * (1 + 0.6 / n)
+      }
+      if (param[2] >= 2){
+        result <- A + (1 / n) * (0.2 + (0.3 / param[2]))
+      }
+    out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Gamma", n = n, Estimated = "scale", Parameters = c(as.character(scale_est),", ",as.character(param[2])), Statistic = result, Statistic_Name = "A^2", Critical = "check documentation for critical values")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # scale known, shape unknown, Case 2
+    if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
+      L <- function(m){
+        (m - 1) * sum(log(x)) - sum(x / param[1]) - n * m * log(param[1]) - n * log(gamma(m))
+      }
+      shape_est <- optimize(L, c(0.00001, 100), maximum = TRUE)$maximum
+      Z <- pgamma(x, scale = param[1], shape = shape_est)
+      result <- A2(Z)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Gamma", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape_est)), Statistic = result, Statistic_Name = "A^2", Critical = "check documentation for critical values")
+      class(out) <- "gof_test"
+      return(out)
+    }
+    
+    # both unknown, Case 3
+    if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
+      L <- function(m){
+        (m - 1) * sum(log(x)) - n * m - n * m * log(sum(x / (m * n))) - n * log(gamma(m))
+      }
+      shape_est <- optimize(L, c(0.00001, 100), maximum = TRUE)$maximum
+      scale_est <- mean(x) / shape_est
+      Z <- pgamma(x, scale = scale_est, shape = shape_est)
+      result <- A2(Z)
+      out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Gamma", n = n, Estimated = "scale, shape", Parameters = c(as.character(scale_est),", ",as.character(shape_est)), Statistic = result, Statistic_Name = "A^2", Critical = "check documentation for critical values")
+      class(out) <- "gof_test"
+      return(out)
+    }
+  }
 }

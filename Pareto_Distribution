@@ -1,10 +1,3 @@
-library(tidyverse)
-library(EnvStats)
-library(rootSolve)
-library(SpatialExtremes)
-library(pracma)
-library(expint)
-
 ### Test statistics for Cramer von Mises- and Anderson Darling test for Goodness of fit
 W2 <- function(x){
   n <- length(x)
@@ -46,13 +39,12 @@ est_pareto <- function(x, param = c(NA,NA)){
   }
 }
 
-
 # Parameters are given as scale, shape (xmin, alpha)
 # Just perform a transformation to get an exponential value distribution, then call     
 # the function exponential_gof
 # Can only implement Case 2 atm. Case 1 and 3 should not give accurate critical values
 # as the transformation depends on estimated parameter
-pareto_gof <- function(x, statistic, param){
+gof_pareto <- function(x, statistic, param){
   x <- sort(x)
   n <- length(x)
   
@@ -61,7 +53,7 @@ pareto_gof <- function(x, statistic, param){
     
     # scale known, shape unknown, Case 2
       y <- log(x / param)
-      exp_trans <- exp_gof(y, "cvm")
+      exp_trans <- gof_exp(y, "cvm")
       shape <- exp_trans$Parameters
       result <- exp_trans$Statistic
       out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Pareto", n = n, Estimated = "shape", Parameters = c(as.character(param),", ",as.character(shape)), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.116] ; .15: [0,.148] ; .10: [0,.175] ; .05: [0,.222] ; .025: [0,.271] ; .01: [0,0.338] ; .005: [0,0.390]")
@@ -75,7 +67,7 @@ pareto_gof <- function(x, statistic, param){
     
     # scale known, shape unknown, Case 2
       y <- log(x / param)
-      exp_trans <- exp_gof(y, "ad")
+      exp_trans <- gof_exp(y, "ad")
       shape <- exp_trans$Parameters
       result <- exp_trans$Statistic
       out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Pareto", n = n, Estimated = "shape", Parameters = c(as.character(param),", ",as.character(shape)), Statistic = result, Statistic_Name = "A^2", Critical = ".25: [0,.736] ; .15: [0,.916] ; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959] ; .005: [0,2.244]")

@@ -1,11 +1,5 @@
 # Note that Weibull distribution is handled via a transformation to the extreme value distribution.
 
-library(tidyverse)
-library(EnvStats)
-library(rootSolve)
-library(SpatialExtremes)
-library(pracma)
-library(expint)
 
 ### Test statistics for Cramer von Mises- and Anderson Darling test for Goodness of fit
 W2 <- function(x){
@@ -30,9 +24,10 @@ F_extreme <- function(x, location, scale){
 }
 
 ### Estimation Function
+# Extreme value / Gumbel
 est_extreme <- function(x, param = c(NA,NA)){
   n <- length(x)
-  
+
   # location unknown, scale known, Case 1
   if (is.na(param[1]) == TRUE & is.na(param[2]) != TRUE){
     location <- -param[2] * log(mean(exp(- x / param[2])))
@@ -41,27 +36,31 @@ est_extreme <- function(x, param = c(NA,NA)){
   
   # location known, scale unknown, Case 2
   if (is.na(param[1]) != TRUE & is.na(param[2]) == TRUE){
-    y <- x - param[1]
-    estimator <- function(scale){
-      return((sum(y) - sum(y * exp(- y / scale))) / n - scale)
+    L <- function(scale){
+      return(- sum((x - param[1]) / scale) - n * log(scale) - sum(exp(- (x - param[1]) / scale)))
     }
-    scale <- uniroot(estimator, c(0,100))$root
-    return(c(param[1], scale))
+    scale_est <- optimize(L, c(0.00001, 100), maximum = TRUE)$maximum
+    return(c(param[1], scale_est))
+    
   }
   
   # both unknown, Case 3
   if (is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
-    estimator <- function(scale){
-      return(mean(x) - (sum(x * exp(- x / scale)) / sum(exp(- x / scale))) - scale)
+    L <- function(params){
+      location <- params[1]
+      scale <- params[2]
+      return(-(- sum((x - location) / scale) - n * log(scale) - sum(exp(- (x - location) / scale))))
     }
-    scale <- uniroot(estimator, c(0.1,100))$root
-    location <- - scale * log(1 / n * sum(exp(- x / scale)))
-    return(c(location, scale))
+    location_est <- optim(c(1,1), L)$par[1]
+    scale_est <- optim(c(1,1), L)$par[2]
+
+    return(c(location_est, scale_est))
   }
 }
 
+
 # Parameters are given as location, scale (alpha, beta)
-extreme_gof <- function(x, statistic, param = c(NA, NA)){
+gof_extreme <- function(x, statistic, param = c(NA, NA)){
   x <- sort(x)
   n <- length(x)
   
@@ -140,8 +139,8 @@ extreme_gof <- function(x, statistic, param = c(NA, NA)){
 
 # Parameters are given as scale, shape (beta, k)
 # Just perform a transformation to get an extreme value distribution, then call       
-# the function extreme_gof
-weibull_gof <- function(x, statistic, param = c(NA, NA)){
+# the function gof_extreme
+gof_weibull <- function(x, statistic, param = c(NA, NA)){
   x <- sort(x)
   n <- length(x)
   y <- sort(-log(x))
@@ -152,7 +151,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # scale unknown, shape known, Case 1
     if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
-    extreme_value_trans <- extreme_gof(y, "cvm", c(NA, 1 / param[2]))
+    extreme_value_trans <- gof_extreme(y, "cvm", c(NA, 1 / param[2]))
     scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
     result <- extreme_value_trans$Statistic
     out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "scale", Parameters = c(as.character(scale),", ",as.character(param[2])), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.116] ; .10: [0,.175] ; .05: [0,.222] ; .025: [0,.271] ; .01: [0,.338]")
@@ -162,7 +161,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # scale known, shape unknown, Case 2
     if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
-    extreme_value_trans <- extreme_gof(y, "cvm", c(- log(1 / param[1]), NA))
+    extreme_value_trans <- gof_extreme(y, "cvm", c(- log(1 / param[1]), NA))
     shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
     result <- extreme_value_trans$Statistic
     out <- list(Method = "Cramér-von Mises Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape)), Statistic = result, Statistic_Name = "W^2", Critical = ".25: [0,.186]; .10: [0,.320] ; .05: [0,.431] ; .025: [0,.547] ; .01: [0,.705]")
@@ -172,7 +171,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # both unknown, Case 3
     if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
-      extreme_value_trans <- extreme_gof(y, "cvm", c(NA,NA))
+      extreme_value_trans <- gof_extreme(y, "cvm", c(NA,NA))
       scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
       shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
       result <- extreme_value_trans$Statistic
@@ -189,7 +188,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # scale unknown, shape known, Case 1
     if(is.na(param[1]) == TRUE & is.na(param[2]) == FALSE){
-    extreme_value_trans <- extreme_gof(y, "ad", c(NA, 1 / param[2]))
+    extreme_value_trans <- gof_extreme(y, "ad", c(NA, 1 / param[2]))
     scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
     result <- extreme_value_trans$Statistic
     out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "scale", Parameters = c(as.character(scale),", ",as.character(param[2])), Statistic = result, Statistic_Name = "A^2", Critical = ".25: [0,.736]; .10: [0,1.062] ; .05: [0,1.321] ; .025: [0,1.591] ; .01: [0,1.959]")
@@ -199,7 +198,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # scale known, shape unknown, Case 2
     if(is.na(param[1]) == FALSE & is.na(param[2]) == TRUE){
-    extreme_value_trans <- extreme_gof(y, "ad", c(- log(1 / param[1]), NA))
+    extreme_value_trans <- gof_extreme(y, "ad", c(- log(1 / param[1]), NA))
     shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
     result <- extreme_value_trans$Statistic
     out <- list(Method = "Anderson-Darling Test for Goodness-of-Fit", Distribution = "Weibull", n = n, Estimated = "shape", Parameters = c(as.character(param[1]),", ",as.character(shape)), Statistic = result, Statistic_Name = "A^2", Critical = ".25: [0,.1.06]; .10: [0,.1.725] ; .05: [0,2.277] ; .025: [0,2.854] ; .01: [0,3.640]")
@@ -209,7 +208,7 @@ weibull_gof <- function(x, statistic, param = c(NA, NA)){
     
     # both unknown, Case 3
     if(is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
-      extreme_value_trans <- extreme_gof(y, "ad", c(NA,NA))
+      extreme_value_trans <- gof_extreme(y, "ad", c(NA,NA))
       scale <- exp(as.numeric(extreme_value_trans$Parameters[1]))
       shape <- 1 / as.numeric(extreme_value_trans$Parameters[3])
       result <- extreme_value_trans$Statistic

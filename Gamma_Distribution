@@ -1,10 +1,3 @@
-library(tidyverse)
-library(EnvStats)
-library(rootSolve)
-library(SpatialExtremes)
-library(pracma)
-library(expint)
-
 ### Test statistics for Cramer von Mises- and Anderson Darling test for Goodness of fit
 W2 <- function(x){
   n <- length(x)
@@ -43,10 +36,11 @@ est_gamma <- function(x, param = c(NA,NA)){
   if (is.na(param[1]) == TRUE & is.na(param[2]) == TRUE){
     return(NA)
   }
+}
   
-  ### Gamma
+### Gamma
 # Parameters are given as scale, shape (beta, m)
-gamma_gof <- function(x, statistic, param = c(NA, NA)){
+gof_gamma <- function(x, statistic, param = c(NA, NA)){
   x <- sort(x)
   n <- length(x)
   
@@ -147,5 +141,4 @@ gamma_gof <- function(x, statistic, param = c(NA, NA)){
       return(out)
     }
   }
-}
 }

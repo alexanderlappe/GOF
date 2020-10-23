@@ -1,0 +1,15 @@
+Package: GOF
+Title: Goodness-of-fit tests with estimated parameters
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Alexander",
+           family = "Lappe",
+           role = c("aut", "cre"),
+           email = "alexanderlappe@gmx.de",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: This package aims to simplify Goodness-of-Fit tests when the distributions are not entirely specified prior to the analysis. For the most frequent distributions, functions are given to calculate test statistics and obtain critical values that account for shifts introduced by estimation of parameters on the same dataset used for testing GOF.
+License: MIT
+URL: https://github.com/alexanderlappe/GOF
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
